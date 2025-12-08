@@ -483,11 +483,61 @@ struct ContentView: View {
     }
 }
 
+// MARK: - Main App
+
+// Wrapper to hold cancellables
+class AppCoordinator {
+    var cancellables = Set<AnyCancellable>()
+}
+
 @main
 struct VaultClipApp: App {
+    @StateObject private var clipboardMonitor = ClipboardMonitor()
+    @StateObject private var clipboardStore = ClipboardStore()
+    @StateObject private var windowState = WindowState()
+
+    private let hotkeyManager = HotkeyManager()
+    private let coordinator = AppCoordinator()
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(
+                store: clipboardStore,
+                windowState: windowState
+            )
         }
+        .windowStyle(.hiddenTitleBar)
+        .windowResizability(.contentSize)
+        .defaultSize(width: 600, height: 400)
+    }
+
+    init() {
+        setupClipboardPipeline()
+        setupHotkey()
+        startMonitoring()
+    }
+
+    private func setupClipboardPipeline() {
+        // Wire monitor to store
+        clipboardMonitor.$newClipboardText
+            .compactMap { $0 }
+            .sink { [clipboardStore] text in
+                Task {
+                    await clipboardStore.addClipboardText(text)
+                }
+            }
+            .store(in: &coordinator.cancellables)
+    }
+
+    private func setupHotkey() {
+        hotkeyManager.register { [windowState] in
+            DispatchQueue.main.async {
+                windowState.toggleVisibility()
+            }
+        }
+    }
+
+    private func startMonitoring() {
+        clipboardMonitor.startMonitoring()
     }
 }
