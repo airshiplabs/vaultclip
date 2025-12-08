@@ -1,0 +1,19 @@
+# Worktrees
+.worktrees/
+
+# Xcode
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+*.xcworkspace/
+xcuserdata/
+DerivedData/
+*.moved-aside
+*.xcuserstate
+
+# Swift
+.build/
+*.swiftpm
+
+# macOS
+.DS_Store
