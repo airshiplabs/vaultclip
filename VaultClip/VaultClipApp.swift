@@ -240,6 +240,57 @@ class ClipboardMonitor: ObservableObject {
     }
 }
 
+// MARK: - Clipboard Store
+
+@MainActor
+class ClipboardStore: ObservableObject {
+    @Published var items: [EncryptedClipboardItem] = []
+
+    private let maxItems = 100  // Limit for prototype
+    private let encryption = ClipboardEncryption()
+
+    func addClipboardText(_ plaintext: String) async {
+        do {
+            // Encrypt the text
+            let encryptedItem = try encryption.encrypt(plaintext)
+
+            // Add to history (newest first)
+            items.insert(encryptedItem, at: 0)
+
+            // Enforce limit
+            if items.count > maxItems {
+                items.removeLast()
+            }
+
+        } catch {
+            // Safe to log errors (not content)
+            print("Encryption failed: \(error)")
+        }
+    }
+
+    func getDecryptedText(for item: EncryptedClipboardItem) -> String? {
+        do {
+            return try encryption.decrypt(item)
+        } catch {
+            print("Decryption failed: \(error)")
+            return nil
+        }
+    }
+
+    func pasteItem(_ item: EncryptedClipboardItem) {
+        guard let plaintext = getDecryptedText(for: item) else { return }
+
+        // Write to pasteboard
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(plaintext, forType: .string)
+    }
+
+    func clearHistory() {
+        items.removeAll()
+    }
+}
+
 @main
 struct VaultClipApp: App {
     var body: some Scene {
