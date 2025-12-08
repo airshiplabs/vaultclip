@@ -421,6 +421,68 @@ struct ClipboardItemRow: View {
     }
 }
 
+// MARK: - Content View
+
+struct ContentView: View {
+    @ObservedObject var store: ClipboardStore
+    @ObservedObject var windowState: WindowState
+
+    @State private var selectedItem: EncryptedClipboardItem?
+    @State private var searchText = ""
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Search bar
+            SearchBar(text: $searchText)
+                .padding()
+
+            // Clipboard history list
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(filteredItems) { item in
+                        ClipboardItemRow(
+                            item: item,
+                            store: store,
+                            isSelected: selectedItem?.id == item.id
+                        )
+                        .onTapGesture {
+                            handleSelection(item)
+                        }
+                    }
+                }
+                .padding()
+            }
+
+            // Footer with stats
+            HStack {
+                Text("\(store.items.count) items")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Button("Clear All") {
+                    store.clearHistory()
+                }
+                .buttonStyle(.borderless)
+            }
+            .padding()
+        }
+        .frame(width: 600, height: 400)
+        .onAppear {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+
+    private var filteredItems: [EncryptedClipboardItem] {
+        // For v0.1, return all items (search not implemented)
+        store.items
+    }
+
+    private func handleSelection(_ item: EncryptedClipboardItem) {
+        store.pasteItem(item)
+        windowState.isVisible = false
+    }
+}
+
 @main
 struct VaultClipApp: App {
     var body: some Scene {
