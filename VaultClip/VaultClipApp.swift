@@ -350,6 +350,77 @@ class HotkeyManager {
     }
 }
 
+// MARK: - Window State
+
+class WindowState: ObservableObject {
+    @Published var isVisible = false
+
+    func toggleVisibility() {
+        isVisible.toggle()
+
+        if isVisible {
+            // Bring window to front
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+}
+
+// MARK: - UI Components
+
+struct SearchBar: View {
+    @Binding var text: String
+
+    var body: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+            TextField("Search clipboard...", text: $text)
+                .textFieldStyle(.plain)
+        }
+        .padding(8)
+        .background(Color.gray.opacity(0.1))
+        .cornerRadius(8)
+    }
+}
+
+struct ClipboardItemRow: View {
+    let item: EncryptedClipboardItem
+    let store: ClipboardStore
+    let isSelected: Bool
+
+    @State private var preview: String = "Decrypting..."
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(preview)
+                    .lineLimit(2)
+                    .font(.body)
+
+                Text(item.timestamp, style: .relative)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+        }
+        .padding()
+        .background(isSelected ? Color.accentColor.opacity(0.2) : Color.clear)
+        .cornerRadius(8)
+        .onAppear {
+            loadPreview()
+        }
+    }
+
+    private func loadPreview() {
+        if let text = store.getDecryptedText(for: item) {
+            // Show first 100 chars as preview
+            preview = String(text.prefix(100))
+        } else {
+            preview = "[Decryption failed]"
+        }
+    }
+}
+
 @main
 struct VaultClipApp: App {
     var body: some Scene {
