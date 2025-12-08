@@ -46,7 +46,7 @@ class KeychainManager {
     }
 
     private static func storeKey(_ key: SymmetricKey) throws {
-        let keyData = key.withUnsafeBytes { Data($0) }
+        var keyData = key.withUnsafeBytes { Data($0) }
 
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -58,7 +58,7 @@ class KeychainManager {
         let status = SecItemAdd(query as CFDictionary, nil)
 
         // Zero the key data
-        zeroMemory(keyData)
+        zeroMemory(&keyData)
 
         guard status == errSecSuccess else {
             throw KeychainError.storeFailed(status)
@@ -76,14 +76,14 @@ class KeychainManager {
         let status = SecItemCopyMatching(query as CFDictionary, &result)
 
         guard status == errSecSuccess,
-              let keyData = result as? Data else {
+              var keyData = result as? Data else {
             throw KeychainError.retrieveFailed(status)
         }
 
         let key = SymmetricKey(data: keyData)
 
         // Zero the key data
-        zeroMemory(keyData)
+        zeroMemory(&keyData)
 
         return key
     }
@@ -104,15 +104,6 @@ class KeychainManager {
 }
 
 // MARK: - Memory Protection
-
-func zeroMemory(_ data: Data) {
-    data.withUnsafeBytes { ptr in
-        if let baseAddress = ptr.baseAddress {
-            memset_s(UnsafeMutableRawPointer(mutating: baseAddress),
-                    ptr.count, 0, ptr.count)
-        }
-    }
-}
 
 func zeroMemory(_ data: inout Data) {
     data.withUnsafeMutableBytes { ptr in
