@@ -76,4 +76,26 @@ class SecurityTests: XCTestCase {
                           "Failed for input: \(plaintext.prefix(20))...")
         }
     }
+
+    // Test Keychain integration
+    func testKeychainMasterKeyPersistence() throws {
+        // Clean slate
+        try? KeychainManager.deleteKey()
+
+        // First retrieval (generates key)
+        let key1 = try KeychainManager.getMasterKey()
+
+        // Second retrieval (should be same key)
+        let key2 = try KeychainManager.getMasterKey()
+
+        // Keys should be identical
+        let data1 = key1.withUnsafeBytes { Data($0) }
+        let data2 = key2.withUnsafeBytes { Data($0) }
+
+        XCTAssertEqual(data1, data2,
+                      "Retrieved key should match stored key")
+
+        // Cleanup
+        try KeychainManager.deleteKey()
+    }
 }
