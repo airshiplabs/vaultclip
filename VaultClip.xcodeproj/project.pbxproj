@@ -353,7 +353,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.airshiplabs.vaultclip;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5.9;
 			};
 			name = Debug;
 		};
@@ -381,7 +381,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.airshiplabs.vaultclip;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5.9;
 			};
 			name = Release;
 		};
@@ -399,7 +399,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.airshiplabs.vaultclip.VaultClipTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5.9;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/VaultClip.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/VaultClip";
 			};
 			name = Debug;
@@ -418,7 +418,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.airshiplabs.vaultclip.VaultClipTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = NO;
-				SWIFT_VERSION = 5.0;
+				SWIFT_VERSION = 5.9;
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/VaultClip.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/VaultClip";
 			};
 			name = Release;
