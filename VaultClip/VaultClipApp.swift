@@ -291,6 +291,65 @@ class ClipboardStore: ObservableObject {
     }
 }
 
+// MARK: - Hotkey Manager
+
+class HotkeyManager {
+    private var hotKeyRef: EventHotKeyRef?
+    private var eventHandler: EventHandlerRef?
+
+    typealias HotkeyCallback = () -> Void
+    private var callback: HotkeyCallback?
+
+    func register(
+        key: UInt32 = UInt32(kVK_ANSI_V),
+        modifiers: UInt32 = UInt32(cmdKey | shiftKey),
+        callback: @escaping HotkeyCallback
+    ) {
+        self.callback = callback
+
+        var hotKeyID = EventHotKeyID()
+        hotKeyID.signature = UTGetOSTypeFromString("VCLP" as CFString)
+        hotKeyID.id = 1
+
+        var eventType = EventTypeSpec()
+        eventType.eventClass = OSType(kEventClassKeyboard)
+        eventType.eventKind = OSType(kEventHotKeyPressed)
+
+        InstallEventHandler(
+            GetApplicationEventTarget(),
+            { _, event, userData -> OSStatus in
+                let manager = Unmanaged<HotkeyManager>
+                    .fromOpaque(userData!)
+                    .takeUnretainedValue()
+                manager.callback?()
+                return noErr
+            },
+            1,
+            &eventType,
+            Unmanaged.passUnretained(self).toOpaque(),
+            &eventHandler
+        )
+
+        RegisterEventHotKey(
+            key,
+            modifiers,
+            hotKeyID,
+            GetApplicationEventTarget(),
+            0,
+            &hotKeyRef
+        )
+    }
+
+    func unregister() {
+        if let hotKeyRef = hotKeyRef {
+            UnregisterEventHotKey(hotKeyRef)
+        }
+        if let eventHandler = eventHandler {
+            RemoveEventHandler(eventHandler)
+        }
+    }
+}
+
 @main
 struct VaultClipApp: App {
     var body: some Scene {
