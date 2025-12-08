@@ -183,6 +183,63 @@ class ClipboardEncryption {
     }
 }
 
+// MARK: - Clipboard Monitor
+
+class ClipboardMonitor: ObservableObject {
+    @Published var newClipboardText: String?
+
+    private var timer: Timer?
+    private var lastChangeCount: Int = 0
+    private let pasteboard = NSPasteboard.general
+    private let pollInterval: TimeInterval = 0.5  // 500ms
+
+    func startMonitoring() {
+        // Initialize with current state
+        lastChangeCount = pasteboard.changeCount
+
+        // Poll for changes
+        timer = Timer.scheduledTimer(
+            withTimeInterval: pollInterval,
+            repeats: true
+        ) { [weak self] _ in
+            self?.checkForChanges()
+        }
+    }
+
+    func stopMonitoring() {
+        timer?.invalidate()
+        timer = nil
+    }
+
+    private func checkForChanges() {
+        let currentChangeCount = pasteboard.changeCount
+
+        // Only process if change count increased
+        guard currentChangeCount > lastChangeCount else { return }
+
+        lastChangeCount = currentChangeCount
+
+        // Extract plain text (safely)
+        guard let text = pasteboard.string(forType: .string),
+              !text.isEmpty else { return }
+
+        // Validate input
+        guard validateClipboardText(text) else { return }
+
+        // Notify observers (will trigger encryption & storage)
+        DispatchQueue.main.async {
+            self.newClipboardText = text
+        }
+    }
+
+    func validateClipboardText(_ text: String) -> Bool {
+        // Basic validation
+        guard text.count <= 1_000_000 else { return false }  // 1MB max
+        guard text.utf16.count > 0 else { return false }     // Valid UTF-16
+        return true
+    }
+}
+
 @main
 struct VaultClipApp: App {
     var body: some Scene {
