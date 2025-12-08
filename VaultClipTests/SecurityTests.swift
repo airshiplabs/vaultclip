@@ -24,15 +24,23 @@ class SecurityTests: XCTestCase {
         let encryption = ClipboardEncryption()
         let plaintext = "sensitive data"
 
-        var encrypted = try encryption.encrypt(plaintext)
+        let encrypted = try encryption.encrypt(plaintext)
 
         // Tamper with ciphertext (flip first byte)
         var tamperedCiphertext = encrypted.ciphertext
         tamperedCiphertext[0] ^= 0xFF
-        encrypted.ciphertext = tamperedCiphertext
+
+        // Create new struct with tampered data
+        let tamperedItem = EncryptedClipboardItem(
+            id: encrypted.id,
+            timestamp: encrypted.timestamp,
+            ciphertext: tamperedCiphertext,
+            nonce: encrypted.nonce,
+            tag: encrypted.tag
+        )
 
         // Decryption MUST fail when data is tampered
-        XCTAssertThrowsError(try encryption.decrypt(encrypted)) { error in
+        XCTAssertThrowsError(try encryption.decrypt(tamperedItem)) { error in
             XCTAssertTrue(error is CryptoKitError,
                          "Should throw CryptoKitError on tampered data")
         }

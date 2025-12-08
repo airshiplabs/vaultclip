@@ -122,6 +122,76 @@ func zeroMemory(_ data: inout Data) {
     }
 }
 
+// MARK: - Clipboard Encryption
+
+class ClipboardEncryption {
+
+    func encrypt(_ plaintext: String) throws -> EncryptedClipboardItem {
+        // Validate input
+        guard !plaintext.isEmpty else {
+            throw EncryptionError.invalidInput
+        }
+
+        // Get master key from Keychain
+        let key = try KeychainManager.getMasterKey()
+
+        // Generate unique nonce (CRITICAL: never reuse)
+        let nonce = AES.GCM.Nonce()
+
+        // Convert string to Data
+        guard let data = plaintext.data(using: .utf8) else {
+            throw EncryptionError.invalidInput
+        }
+
+        // Encrypt with AES-256-GCM
+        let sealedBox = try AES.GCM.seal(data, using: key, nonce: nonce)
+
+        // Extract components
+        return EncryptedClipboardItem(
+            id: UUID(),
+            timestamp: Date(),
+            ciphertext: sealedBox.ciphertext,
+            nonce: Data(sealedBox.nonce),
+            tag: sealedBox.tag
+        )
+    }
+
+    func decrypt(_ item: EncryptedClipboardItem) throws -> String {
+        // Get master key
+        let key = try KeychainManager.getMasterKey()
+
+        // Reconstruct nonce
+        guard let nonce = try? AES.GCM.Nonce(data: item.nonce) else {
+            throw EncryptionError.corruptedData
+        }
+
+        // Reconstruct sealed box
+        guard let sealedBox = try? AES.GCM.SealedBox(
+            nonce: nonce,
+            ciphertext: item.ciphertext,
+            tag: item.tag
+        ) else {
+            throw EncryptionError.corruptedData
+        }
+
+        // Decrypt and verify authentication tag
+        let decryptedData = try AES.GCM.open(sealedBox, using: key)
+
+        // Convert to string
+        guard let plaintext = String(data: decryptedData, encoding: .utf8) else {
+            throw EncryptionError.corruptedData
+        }
+
+        // Zero the decrypted data
+        defer {
+            var mutableData = decryptedData
+            zeroMemory(&mutableData)
+        }
+
+        return plaintext
+    }
+}
+
 @main
 struct VaultClipApp: App {
     var body: some Scene {
