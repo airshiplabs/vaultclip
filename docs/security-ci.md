@@ -16,9 +16,9 @@ must pass before build and test steps run.
 
 ### When It Runs
 
-- **Push events**: `main` branch and all `feature/*` branches
+- **Push events**: `main` branch only
 - **Pull requests**: Targeting `main` branch
-- **Frequency**: Every commit to protected branches
+- **Frequency**: Every commit to `main` and every PR to `main`
 
 ### Quick Status Check
 
