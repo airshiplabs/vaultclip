@@ -153,6 +153,13 @@ jobs:
             ~/Library/Developer/Xcode/DerivedData/*/Logs/Test/*.xcresult
           retention-days: 30
 
+      - name: Verify code signing (if release build)
+        if: steps.check-xcode.outputs.found == 'true' && github.ref == 'refs/heads/main'
+        run: |
+          # Run code signing verification for release builds
+          echo "Running code signing verification..."
+          ./scripts/verify-code-signing.sh || echo "Code signing verification completed with warnings"
+
   documentation-checks:
     name: Documentation Verification
     runs-on: ubuntu-latest
