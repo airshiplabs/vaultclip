@@ -20,7 +20,7 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.2'
+          xcode-version: '15.4'
 
       - name: Check for banned crypto APIs
         run: |
@@ -101,7 +101,7 @@ jobs:
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: '15.2'
+          xcode-version: '15.4'
 
       - name: Check for Xcode project
         id: check-xcode
