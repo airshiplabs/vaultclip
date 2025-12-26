@@ -1,0 +1,234 @@
+name: Security CI
+
+on:
+  push:
+    branches: [ main, 'feature/**' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  security-checks:
+    name: Security Verification
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for comprehensive checks
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.2'
+
+      - name: Check for banned crypto APIs
+        run: |
+          echo "Checking for deprecated CommonCrypto APIs..."
+          if grep -r "CCCrypt\|CCKeyDerivation" --include="*.swift" . ; then
+            echo "ERROR: Found banned CommonCrypto APIs. Use CryptoKit instead."
+            exit 1
+          fi
+          echo "✓ No banned crypto APIs found"
+
+      - name: Check for insecure deserialization
+        run: |
+          echo "Checking for insecure NSKeyedUnarchiver usage..."
+          if grep -r "unarchiveObject" --include="*.swift" . ; then
+            echo "ERROR: Found insecure unarchiveObject calls. Use NSSecureCoding."
+            exit 1
+          fi
+          echo "✓ No insecure deserialization found"
+
+      - name: Verify Keychain configuration
+        run: |
+          echo "Checking Keychain protection class..."
+          if ! grep -r "kSecAttrAccessibleWhenUnlockedThisDeviceOnly" --include="*.swift" . ; then
+            echo "WARNING: kSecAttrAccessibleWhenUnlockedThisDeviceOnly not found"
+            echo "If using Keychain, ensure correct protection class"
+          else
+            echo "✓ Correct Keychain protection class found"
+          fi
+
+      - name: Check for sensitive data logging
+        run: |
+          echo "Checking for potential sensitive data logging..."
+          # Look for print/os_log that might expose clipboard content
+          if grep -r "print.*clipboard\|os_log.*password\|NSLog.*content" --include="*.swift" . ; then
+            echo "WARNING: Potential sensitive data logging detected"
+            echo "Review these lines to ensure no clipboard content is logged"
+          else
+            echo "✓ No obvious sensitive data logging found"
+          fi
+
+      - name: Verify sandbox entitlements
+        run: |
+          echo "Checking for App Sandbox entitlements..."
+          if find . -name "*.entitlements" -type f | xargs grep -l "com.apple.security.app-sandbox" | grep -q . ; then
+            echo "✓ App Sandbox entitlement found"
+
+            # Check for network entitlements (should not be present by default)
+            if find . -name "*.entitlements" -type f | xargs grep -l "com.apple.security.network.client" | grep -q . ; then
+              echo "WARNING: Network client entitlement found"
+              echo "Ensure this is intentional and documented"
+            else
+              echo "✓ No network entitlements (good for security)"
+            fi
+          else
+            echo "WARNING: No App Sandbox entitlement found in *.entitlements files"
+          fi
+
+      - name: Check for hardcoded secrets
+        run: |
+          echo "Scanning for potential hardcoded secrets..."
+          # Basic pattern matching (consider using tools like gitleaks or trufflehog)
+          if grep -rE "(password|secret|api_key|token)\s*=\s*['\"][^'\"]+['\"]" --include="*.swift" . ; then
+            echo "WARNING: Potential hardcoded secrets found"
+            echo "Review these lines to ensure no actual secrets are committed"
+          else
+            echo "✓ No obvious hardcoded secrets found"
+          fi
+
+  build-and-test:
+    name: Build and Test
+    runs-on: macos-latest
+    needs: security-checks
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.2'
+
+      - name: Check for Xcode project
+        id: check-xcode
+        run: |
+          if find . -name "*.xcodeproj" -type d | grep -q . ; then
+            echo "found=true" >> $GITHUB_OUTPUT
+            echo "✓ Xcode project found"
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+            echo "⊘ No Xcode project found (project may be in planning phase)"
+          fi
+
+      - name: Build VaultClip
+        if: steps.check-xcode.outputs.found == 'true'
+        run: |
+          # Find the first .xcodeproj (assumes single project)
+          PROJECT=$(find . -name "*.xcodeproj" -type d | head -n 1)
+
+          echo "Building project: $PROJECT"
+          xcodebuild clean build \
+            -project "$PROJECT" \
+            -scheme VaultClip \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Run Security Tests
+        if: steps.check-xcode.outputs.found == 'true'
+        run: |
+          PROJECT=$(find . -name "*.xcodeproj" -type d | head -n 1)
+
+          echo "Running tests for project: $PROJECT"
+          xcodebuild test \
+            -project "$PROJECT" \
+            -scheme VaultClip \
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload test results
+        if: always() && steps.check-xcode.outputs.found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            ~/Library/Developer/Xcode/DerivedData/*/Logs/Test/*.xcresult
+          retention-days: 30
+
+  documentation-checks:
+    name: Documentation Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify required documentation
+        run: |
+          echo "Checking for required documentation files..."
+
+          REQUIRED_FILES=(
+            "README.md"
+            "CLAUDE.md"
+            "docs/plans/security-requirements.md"
+          )
+
+          MISSING=0
+          for file in "${REQUIRED_FILES[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✓ Found: $file"
+            else
+              echo "✗ Missing: $file"
+              MISSING=$((MISSING + 1))
+            fi
+          done
+
+          if [ $MISSING -gt 0 ]; then
+            echo "ERROR: $MISSING required documentation file(s) missing"
+            exit 1
+          fi
+
+          echo "✓ All required documentation files present"
+
+      - name: Check for TODO markers
+        run: |
+          echo "Checking for TODO markers in code..."
+          if grep -r "TODO\|FIXME\|HACK" --include="*.swift" . ; then
+            echo "WARNING: Found TODO/FIXME markers in code"
+            echo "These should be tracked as beads issues instead"
+          else
+            echo "✓ No TODO markers found (using beads for tracking)"
+          fi
+
+  beads-verification:
+    name: Beads Issue Tracking Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for beads issues
+        run: |
+          if [ -f ".beads/issues.jsonl" ]; then
+            echo "✓ Beads issue tracking file found"
+
+            # Count open issues
+            OPEN_COUNT=$(jq -r 'select(.status == "open") | .id' .beads/issues.jsonl 2>/dev/null | wc -l)
+            echo "Open issues: $OPEN_COUNT"
+
+            # List high-priority open issues
+            echo "High-priority issues:"
+            jq -r 'select(.status == "open" and (.priority == 0 or .priority == 1)) | "  - \(.id): \(.title) (P\(.priority))"' .beads/issues.jsonl 2>/dev/null || echo "  (none or jq not available)"
+          else
+            echo "⊘ No beads issue tracking file found"
+            echo "This is expected if project is just starting"
+          fi
+
+      - name: Check for markdown TODO lists
+        run: |
+          echo "Checking for markdown TODO lists (should use beads instead)..."
+          if grep -rE "- \[ \]|TODO:" --include="*.md" . --exclude-dir=".git" --exclude-dir="history" ; then
+            echo "WARNING: Found markdown TODO lists"
+            echo "Consider converting these to beads issues for better tracking"
+          else
+            echo "✓ No markdown TODO lists found (good!)"
+          fi
