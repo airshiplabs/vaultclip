@@ -101,13 +101,13 @@ class SecurityEnhancementsTests: XCTestCase {
 
     // MARK: - Authentication Manager (vaultclip-13n)
 
-    func testAuthManagerInitialStateIsLocked() {
+    @MainActor func testAuthManagerInitialStateIsLocked() {
         let authManager = AuthenticationManager()
         XCTAssertFalse(authManager.isAuthenticated,
             "AuthenticationManager must start in locked state")
     }
 
-    func testAuthManagerLockResetsState() {
+    @MainActor func testAuthManagerLockResetsState() {
         let authManager = AuthenticationManager()
         // Simulate authenticated state (would normally require biometric prompt)
         // We can only test that lock() resets to false
@@ -115,7 +115,7 @@ class SecurityEnhancementsTests: XCTestCase {
         XCTAssertFalse(authManager.isAuthenticated)
     }
 
-    func testAuthManagerRecordActivityDoesNotCrash() {
+    @MainActor func testAuthManagerRecordActivityDoesNotCrash() {
         let authManager = AuthenticationManager()
         // recordActivity() should not throw or crash
         authManager.recordActivity()
@@ -187,11 +187,12 @@ class SecurityEnhancementsTests: XCTestCase {
 
     func testPerItemKeyTamperDetection() throws {
         let crypto = EnhancedClipboardEncryption()
-        let (item, var encryptedKey) = try crypto.encrypt("tamper test")
+        let (item, encryptedKey) = try crypto.encrypt("tamper test")
         // Flip a byte in the encrypted key — decryption must fail
-        encryptedKey[0] ^= 0xFF
+        var tamperedKey = encryptedKey
+        tamperedKey[0] ^= 0xFF
         XCTAssertThrowsError(
-            try crypto.decrypt(item, encryptedItemKey: encryptedKey),
+            try crypto.decrypt(item, encryptedItemKey: tamperedKey),
             "Tampered item key must cause decryption failure"
         )
     }
