@@ -790,8 +790,6 @@ struct VaultClipApp: App {
             }
         }
         .windowStyle(.hiddenTitleBar)
-        .windowResizability(.contentSize)
-        .defaultSize(width: 600, height: 400)
     }
 
     init() {
